@@ -1,5 +1,6 @@
 # Cartograf
-** Struct-to-Struct Mapping Utility for Elixir **
+[![Build Status](https://travis-ci.org/Herlitzd/cartograf.svg?branch=master)](https://travis-ci.org/Herlitzd/cartograf)
+## Struct-to-Struct Mapping Utility for Elixir
 
 ```
 defmodule A, do: defstruct [:a, :b, :cc, :d]
