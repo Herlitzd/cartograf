@@ -41,7 +41,6 @@ defmodule Cartograf do
   end
 
   def do_explicit_field_translation(from_struct, to_struct, field_fns) do
-    {already_set, mapped} =
       Enum.reduce(field_fns, {[], to_struct}, fn fields, {keys, fns} ->
         {source_dest_tup, mapped_so_far} = fields.(from_struct, fns)
         {[source_dest_tup | keys], mapped_so_far}
