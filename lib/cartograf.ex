@@ -1,12 +1,12 @@
 defmodule Cartograf do
   require IEx
+
   defmacro __using__(_) do
     quote do
       import Cartograf
       Module.register_attribute(__MODULE__, :already_set, accumulate: true)
     end
   end
-
 
   defmacro map(from_t, to_t, name, opts \\ [], do: block) do
     quote do
@@ -17,8 +17,11 @@ defmodule Cartograf do
         {already_set, mapped} =
           do_explicit_field_translation(from, %unquote(to_t){}, unquote(block))
 
+        from_symbols_mapped = Enum.map(already_set, &elem(&1, 0))
+        from_symbols_mapped = [:__struct__ | from_symbols_mapped]
+
         if(auto?) do
-          do_auto_map(mapped, from, Enum.map(already_set, &elem(&1, 0)))
+          do_auto_map(mapped, from, from_symbols_mapped)
         else
           mapped
         end
@@ -27,14 +30,12 @@ defmodule Cartograf do
   end
 
   def do_auto_map(mapped_result, from_struct, set_src_keys) do
-    IO.inspect(mapped_result)
     not_mapped = Enum.filter(Map.keys(from_struct), fn el -> !Enum.member?(set_src_keys, el) end)
-
     Enum.reduce(not_mapped, mapped_result, fn curr, acc ->
       if(Map.has_key?(acc, curr)) do
         Map.put(acc, curr, Map.get(from_struct, curr))
       else
-        raise Cartograf.MappingException, field: curr
+        raise Cartograf.MappingException, message: "not mapped: #{curr}"
       end
     end)
   end
@@ -55,50 +56,11 @@ defmodule Cartograf do
       end
     end
   end
-end
-
-defmodule Example do
-  import Cartograf
-
-  map(Ex.A, Ex.B, :a_to_b, auto: true) do
-    [
-      let(:a, :AA),
-      let(:b, :b),
-      let(:c, :c),
-      let(:d, :DD)
-    ]
-  end
-
-  map(Ex.C, Ex.A, :c_to_a) do
-    [
-      let(:a, :a),
-      let(:b, :b),
-      let(:c, :c),
-      let(:d, :d)
-    ]
-  end
-
-  map(Ex.A, Ex.C, :a_to_c) do
-    [
-      # let(:a, :a),
-      # let(:b, :b),
-      # let(:c, :c),
-      # let(:d, :d)
-    ]
-  end
-
-  def test() do
-    a = %Ex.A{a: "a", b: "b", c: "c", d: "d"}
-    a_to_b(a)
-  end
-
-  def test1() do
-    c = %Ex.C{a: "a", b: "b", c: "c", d: "d", e: "e"}
-    c_to_a(c)
-  end
-
-  def test2() do
-    a = %Ex.A{a: "a", b: "b", c: "c", d: "d"}
-    a_to_c(a)
+  defmacro drop(source_key) do
+    quote do
+      fn from, to ->
+        {{unquote(source_key), nil}, to}
+      end
+    end
   end
 end
