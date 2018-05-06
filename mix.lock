@@ -1,0 +1,3 @@
+%{
+  "maptu": {:hex, :maptu, "1.0.0", "3f1915d3241a733f46a39e935bed369faaf4ff69182b95ea58e9ad1b065c3b11", [], [], "hexpm"},
+}

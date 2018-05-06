@@ -1,3 +1,3 @@
 defmodule Ex.B do
-  defstruct [:AA, :b, :c, :d]
+  defstruct [:AA, :b, :c, :DD]
 end
