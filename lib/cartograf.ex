@@ -20,17 +20,30 @@ defmodule Cartograf do
         from_symbols_mapped = Enum.map(already_set, &elem(&1, 0))
         from_symbols_mapped = [:__struct__ | from_symbols_mapped]
 
-        if(auto?) do
-          do_auto_map(mapped, from, from_symbols_mapped)
-        else
-          mapped
+        not_mapped =
+          Enum.filter(Map.keys(from), fn el ->
+            !Enum.member?(from_symbols_mapped, el)
+          end)
+
+        cond do
+          auto? ->
+            # try to auto map remaining fields
+            do_auto_map(mapped, from, not_mapped)
+
+          Enum.any?(not_mapped) ->
+            # auto is off, but some fields were missed
+            raise Cartograf.MappingException, message: "not mapped: #{inspect(not_mapped)}"
+
+          true ->
+            # if we get here, then all the fields were already mapped
+            # before even checking for auto?
+            mapped
         end
       end
     end
   end
 
-  def do_auto_map(mapped_result, from_struct, set_src_keys) do
-    not_mapped = Enum.filter(Map.keys(from_struct), fn el -> !Enum.member?(set_src_keys, el) end)
+  def do_auto_map(mapped_result, from_struct, not_mapped) do
     Enum.reduce(not_mapped, mapped_result, fn curr, acc ->
       if(Map.has_key?(acc, curr)) do
         Map.put(acc, curr, Map.get(from_struct, curr))
@@ -41,10 +54,10 @@ defmodule Cartograf do
   end
 
   def do_explicit_field_translation(from_struct, to_struct, field_fns) do
-      Enum.reduce(field_fns, {[], to_struct}, fn fields, {keys, fns} ->
-        {source_dest_tup, mapped_so_far} = fields.(from_struct, fns)
-        {[source_dest_tup | keys], mapped_so_far}
-      end)
+    Enum.reduce(field_fns, {[], to_struct}, fn fields, {keys, fns} ->
+      {source_dest_tup, mapped_so_far} = fields.(from_struct, fns)
+      {[source_dest_tup | keys], mapped_so_far}
+    end)
   end
 
   defmacro let(source_key, dest_key) do
@@ -55,6 +68,7 @@ defmodule Cartograf do
       end
     end
   end
+
   defmacro drop(source_key) do
     quote do
       fn from, to ->

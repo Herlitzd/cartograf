@@ -87,7 +87,6 @@ defmodule CartografTest.Basic do
     assert_raise FunctionClauseError, fn -> one_to_one(t) end
   end
 
-  @tag :skip
   test "non-auto failure" do
     t = %A{a: 1, b: 2, c: 3, d: 4}
     assert_raise Cartograf.MappingException, fn ->
