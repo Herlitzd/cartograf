@@ -43,6 +43,7 @@ defmodule Cartograf do
     end
   end
 
+  @doc false
   def do_auto_map(mapped_result, from_struct, not_mapped) do
     Enum.reduce(not_mapped, mapped_result, fn curr, acc ->
       if(Map.has_key?(acc, curr)) do
@@ -53,10 +54,24 @@ defmodule Cartograf do
     end)
   end
 
+  @doc false
   def do_explicit_field_translation(from_struct, to_struct, field_fns) do
     Enum.reduce(field_fns, {[], to_struct}, fn fields, {keys, fns} ->
-      {source_dest_tup, mapped_so_far} = fields.(from_struct, fns)
-      {[source_dest_tup | keys], mapped_so_far}
+      case fields.(from_struct, fns) do
+        {source_dest_tup, mapped_so_far} when is_tuple(source_dest_tup) ->
+          {[source_dest_tup | keys], mapped_so_far}
+
+        {source_dest_tup_lst, mapped_so_far} when is_list(source_dest_tup_lst) ->
+          {source_dest_tup_lst ++ keys, mapped_so_far}
+      end
+
+      # {source_dest_tup, mapped_so_far} = fields.(from_struct, fns)
+
+      # # if(is_tuple(source_dest_tup)) do
+      # {[source_dest_tup | keys], mapped_so_far}
+      # # else
+      # # {List.flatten(source_dest_tup) ++ keys, mapped_so_far}
+      # # end
     end)
   end
 
@@ -73,6 +88,21 @@ defmodule Cartograf do
     quote do
       fn from, to ->
         {{unquote(source_key), nil}, to}
+      end
+    end
+  end
+
+  defmacro nest(to_t, dest_key, do: block) do
+    quote do
+      fn from, to ->
+        {fields, nested} = do_explicit_field_translation(from, %unquote(to_t){}, unquote(block))
+
+        {fields,
+         Map.put(
+           to,
+           unquote(dest_key),
+           nested
+         )}
       end
     end
   end
