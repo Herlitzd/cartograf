@@ -44,6 +44,17 @@ defmodule CartografTest.Basic do
   map A, A, :a_to_a, auto: false do
     []
   end
+  map A, C, :with_const do
+    [
+      # We must :a here because
+      # it will not be auto bound
+      # as doing so would overrite
+      # the const field
+      const(:a, "Hello"),
+      let(:d, :dd),
+      drop(:a)
+    ]
+  end
 
   test "one to one mapping" do
     t = one_to_one(%A{a: 1, b: 2, c: 3, d: 4})
@@ -93,4 +104,13 @@ defmodule CartografTest.Basic do
       a_to_a(t)
     end
   end
+  test "const use" do
+    t = with_const(%A{a: 1, b: 2, c: 3, d: 4})
+    assert %C{} = t
+    assert t.a == "Hello"
+    assert t.b == 2
+    assert t.c == 3
+    assert t.dd == 4
+  end
+
 end

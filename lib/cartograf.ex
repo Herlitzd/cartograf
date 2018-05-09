@@ -17,7 +17,11 @@ defmodule Cartograf do
         {already_set, mapped} =
           do_explicit_field_translation(from, %unquote(to_t){}, unquote(block))
 
-        from_symbols_mapped = Enum.map(already_set, &elem(&1, 0))
+        {from_symbols_mapped, to_symbols_mapped} =
+          Enum.reduce(already_set, {[], []}, fn curr, {f, t} ->
+            {[elem(curr, 0) | f], [elem(curr, 1) | t]}
+          end)
+
         from_symbols_mapped = [:__struct__ | from_symbols_mapped]
 
         not_mapped =
@@ -28,7 +32,7 @@ defmodule Cartograf do
         cond do
           auto? ->
             # try to auto map remaining fields
-            do_auto_map(mapped, from, not_mapped)
+            do_auto_map(mapped, from, not_mapped, to_symbols_mapped)
 
           Enum.any?(not_mapped) ->
             # auto is off, but some fields were missed
@@ -44,9 +48,10 @@ defmodule Cartograf do
   end
 
   @doc false
-  def do_auto_map(mapped_result, from_struct, not_mapped) do
+  def do_auto_map(mapped_result, from_struct, not_mapped, already_set) do
     Enum.reduce(not_mapped, mapped_result, fn curr, acc ->
-      if(Map.has_key?(acc, curr)) do
+      # Try to automap, but don't override explicit binding
+      if(Map.has_key?(acc, curr) && !Enum.member?(already_set, curr)) do
         Map.put(acc, curr, Map.get(from_struct, curr))
       else
         raise Cartograf.MappingException, message: "not mapped: #{curr}"
@@ -64,14 +69,6 @@ defmodule Cartograf do
         {source_dest_tup_lst, mapped_so_far} when is_list(source_dest_tup_lst) ->
           {source_dest_tup_lst ++ keys, mapped_so_far}
       end
-
-      # {source_dest_tup, mapped_so_far} = fields.(from_struct, fns)
-
-      # # if(is_tuple(source_dest_tup)) do
-      # {[source_dest_tup | keys], mapped_so_far}
-      # # else
-      # # {List.flatten(source_dest_tup) ++ keys, mapped_so_far}
-      # # end
     end)
   end
 
@@ -92,12 +89,26 @@ defmodule Cartograf do
     end
   end
 
+  defmacro const(dest_key, value) do
+    quote do
+      fn from, to ->
+        key = unquote(dest_key)
+        {{nil, key}, Map.put(to, key, unquote(value))}
+      end
+    end
+  end
+
   defmacro nest(to_t, dest_key, do: block) do
     quote do
       fn from, to ->
         {fields, nested} = do_explicit_field_translation(from, %unquote(to_t){}, unquote(block))
 
-        {fields,
+        # When working with nested fields, it makes no sense
+        # to report which dest fields were mapped as dest is
+        # ambigous
+        source_fields = Enum.map(fields, fn el -> {elem(el, 0), nil} end)
+
+        {source_fields,
          Map.put(
            to,
            unquote(dest_key),
