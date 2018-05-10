@@ -1,6 +1,9 @@
 # Cartograf
 [![Build Status](https://travis-ci.org/Herlitzd/cartograf.svg?branch=master)](https://travis-ci.org/Herlitzd/cartograf)
 ## Struct-to-Struct Mapping Utility for Elixir
+*This Project is still under development, and may not be safe for production.*
+
+Documentation can be found at [https://hexdocs.pm/cartograf](https://hexdocs.pm/cartograf).
 
 ### Building Mapping Functions
 ```elixir
@@ -52,8 +55,9 @@ by adding `cartograf` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
+    {:cartograf, "~> 0.1.0"}
+    # or
     {:cartograf, git: "https://github.com/Herlitzd/cartograf.git"}
   ]
 end
 ```
-

@@ -6,7 +6,6 @@ defmodule Cartograf.MixProject do
       app: :cartograf,
       version: "0.1.0",
       elixir: "~> 1.6",
-      start_permanent: Mix.env() == :prod,
       deps: deps(),
       # Hex Config
       description: description(),
@@ -32,7 +31,7 @@ defmodule Cartograf.MixProject do
     [{:ex_doc, "~> 0.16", only: :dev, runtime: false}]
   end
 
-  defp description, do: "A set of macros to help facilitate struct-to-struct field mapping"
+  defp description, do: "A set of macros to help facilitate struct-to-struct field mapping."
   defp package() do
     [
       # This option is only needed when you don't want to use the OTP application name
