@@ -35,16 +35,22 @@ end
 ```
 ### Invoking Mapping Functions
 ```elixir
-mapped = YourMod.a_to_b(%A{a:..., b:...})
-# where mapped.__struct__ is B
-
+iex> YourModule.a_to_b(%A{a: 1, b: 2, c: 3, d: 4})
+%B{a: 1, b: 2, c: 3, d: 4, e: nil}
 ```
-## List of Binders
-* `map(from_module, to_module, name_of_fn, opts // [])`
-* `let(from_symbol, to_symbol)`
-* `drop(from_symbol)`
-* `const(to_symbol, value)`
-* `nest(to_module, dest_key)`
+## List of Forms
+For more information, please look at the docs and tests.
+
+* `map(from_module, to_module, name_of_fn, opts) do ...`\
+  Setup a new mapping function
+* `let(from_symbol, to_symbol)`\
+  Set field to field mapping
+* `drop(from_symbol)`\
+  Prevent a source field from being mapped
+* `const(to_symbol, value)`\
+  Provide a constant value for a destination field
+* `nest(nested_module, dest_key) do ...`\
+  Specify a nested struct type, and a destination field for it.
 
 
 ## Installation
