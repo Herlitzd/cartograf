@@ -44,6 +44,7 @@ defmodule CartografTest.Basic do
   map A, A, :a_to_a, auto: false do
     []
   end
+
   map A, C, :with_const do
     [
       # We must :a here because
@@ -100,10 +101,12 @@ defmodule CartografTest.Basic do
 
   test "non-auto failure" do
     t = %A{a: 1, b: 2, c: 3, d: 4}
+
     assert_raise Cartograf.MappingException, fn ->
       a_to_a(t)
     end
   end
+
   test "const use" do
     t = with_const(%A{a: 1, b: 2, c: 3, d: 4})
     assert %C{} = t
@@ -112,5 +115,4 @@ defmodule CartografTest.Basic do
     assert t.c == 3
     assert t.dd == 4
   end
-
 end

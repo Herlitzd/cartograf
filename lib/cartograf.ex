@@ -65,6 +65,47 @@ defmodule Cartograf do
     end
   end
 
+  defp get_children({:__block__, _meta, elements}) do
+    elements
+  end
+
+  defp get_children(element) do
+    [element]
+  end
+
+  defp map_internal(from_t, to_t, name, auto?, children_fns) do
+    quote do
+      def unquote(:"#{name}")(from = %unquote(from_t){}, to \\ %unquote(to_t){}) do
+        {already_set, out} =
+          Enum.reduce(unquote(children_fns), {[], to}, fn el, {set, acc} ->
+            {just_set, new} = el.(from, acc)
+            {[just_set | set], new}
+          end)
+
+        out
+      end
+    end
+  end
+
+  @spec t(module(), module(), atom, list()) :: any()
+  defmacro t(from_t, to_t, name, kw \\ []) do
+    IO.inspect(kw)
+  end
+
+  @spec m(module(), module(), atom, [], do: any()) :: any()
+  defmacro m(from_t, to_t, name, opts \\ [], do: block) do
+    children = get_children(block)
+
+    children_fns =
+      Macro.prewalk(children, fn k ->
+        Macro.expand(k, __ENV__)
+      end)
+
+    auto? = Keyword.get(opts, :auto, true)
+
+    map_internal(from_t, to_t, name, auto?, children_fns)
+  end
+
   @doc """
   Creates a function in the the current module for mapping from
   struct to another.
@@ -152,6 +193,7 @@ defmodule Cartograf do
       end
     end)
   end
+
   @doc """
   Specify where the a field in the input should be mapped to
   in the out.
@@ -165,6 +207,7 @@ defmodule Cartograf do
       end
     end
   end
+
   @doc """
   Allow for a field from the input to be excluded from
   the output.

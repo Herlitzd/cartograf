@@ -28,10 +28,11 @@ defmodule Cartograf.MixProject do
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
-    [{:ex_doc, "~> 0.16", only: :dev, runtime: false}]
+    [{:ex_doc, "~> 0.16", only: :dev, runtime: false}, {:mex, "~> 0.0.1", only: :dev}]
   end
 
   defp description, do: "A set of macros to help facilitate struct-to-struct field mapping."
+
   defp package() do
     [
       # This option is only needed when you don't want to use the OTP application name
@@ -43,5 +44,4 @@ defmodule Cartograf.MixProject do
       links: %{"GitHub" => "https://github.com/Herlitzd/cartograf"}
     ]
   end
-
 end
