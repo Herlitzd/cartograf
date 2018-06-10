@@ -17,6 +17,12 @@ defmodule RevisedTest do
     let :c, :cc
     let :d, :dd
   end
+  map AR, BR, :with_const do
+    let :a, :aa
+    const :bb, "abc"
+    let :c, :cc
+    let :d, :dd
+  end
   test "rev" do
     p = %AR{a: 1, b: 2, c: 3, d: 4}
     k = revised(p)
@@ -25,5 +31,12 @@ defmodule RevisedTest do
     assert k.cc == 3
     assert k.dd == 4
   end
-
+  test "revised with const" do
+    p = %AR{a: 1, b: 2, c: 3, d: 4}
+    k = with_const(p)
+    assert k.aa == 1
+    assert k.bb == "abc"
+    assert k.cc == 3
+    assert k.dd == 4
+  end
 end

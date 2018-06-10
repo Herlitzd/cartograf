@@ -18,26 +18,40 @@ defmodule Revised do
       Map.update(acc, atm, [tup], fn val -> [tup | val] end)
     end)
   end
+  defp get_list(lst, atom) do
+    Map.get(lst, atom, [])
+  end
 
-  defp make_map({bindings, to}) do
+  defp make_map({bindings, to, bound_var}) do
     to_keys = []
-    # const_mapping
+    bound = Macro.var(bound_var, __MODULE__)
+    const_mapping =
+      Enum.reduce(get_list(bindings,:const), [], fn {t, v}, acc ->
+        [{t, v} | acc]
+      end)
     let_mapping =
-      Enum.reduce(bindings[:let], [], fn {f, t}, acc ->
-        [{t, quote(do: from.unquote(f))} | acc]
+      Enum.reduce(get_list(bindings, :let), [], fn {f, t}, acc ->
+        [{t, quote(do: unquote(bound).unquote(f))} | acc]
       end)
 
-    {:%, [], [to, {:%{}, [], let_mapping}]}
+    merged_mapping = let_mapping ++ const_mapping
+    {:%, [], [to, {:%{}, [], merged_mapping}]}
+  end
+
+  defp random_id do
+    String.to_atom(Integer.to_string(:rand.uniform(4294967296), 32))
   end
 
   defp map_internal(from_t, to_t, name, auto?, children) do
     mappings = tokenize(children)
-    p = make_map({mappings, to_t})
-    IO.inspect(p)
-
+    IO.inspect(mappings)
+    binding = random_id
+    created_map = make_map({mappings, to_t, binding})
+    binding = Macro.var(binding, __MODULE__)
+    IO.inspect(created_map)
     quote do
-      def unquote(:"#{name}")(from = %unquote(from_t){}, to \\ %unquote(to_t){}) do
-        unquote(p)
+      def unquote(:"#{name}")(unquote(binding) = %unquote(from_t){}, to \\ %unquote(to_t){}) do
+        unquote(created_map)
       end
     end
   end
@@ -65,7 +79,7 @@ defmodule Revised do
     {:let, {source_key, dest_key}}
   end
 
-  @spec const(atom(), atom()) :: any()
+  @spec const(atom(), any()) :: any()
   defmacro const(dest_key, val) do
     {:const, {dest_key, val}}
   end
