@@ -28,7 +28,7 @@ defmodule Cartograf.MixProject do
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
-    [{:ex_doc, "~> 0.16", only: :dev, runtime: false}, {:mex, "~> 0.0.1", only: :dev}]
+    [{:ex_doc, "~> 0.16", only: :dev, runtime: false}]
   end
 
   defp description, do: "A set of macros to help facilitate struct-to-struct field mapping."

@@ -23,7 +23,7 @@ defmodule Revised do
     Map.get(lst, atom, [])
   end
 
-  defp make_map({bindings, to, bound_var}) do
+  defp make_struct_map({bindings, to, bound_var}) do
     to_keys = []
     bound = Macro.var(bound_var, __MODULE__)
     const_mapping =
@@ -52,17 +52,20 @@ defmodule Revised do
         end
       end)
     mappings = tokenize(children)
-    make_map({mappings, to_t, binding})
+    make_struct_map({mappings, to_t, binding})
   end
 
   defp map_p(from_t, to_t, name, auto?, children) do
     binding = random_id()
     created_map = map_internal(children, to_t, binding)
-
+    IO.inspect(created_map)
     binding = Macro.var(binding, __MODULE__)
     quote do
-      def unquote(:"#{name}")(unquote(binding) = %unquote(from_t){}, to \\ %unquote(to_t){}) do
+      def unquote(name)(unquote(binding) = %unquote(from_t){}) do
         unquote(created_map)
+      end
+      def unquote(:"#{name}_map")(unquote(binding) = %unquote(from_t){}) do
+        Map.from_struct(unquote(created_map))
       end
     end
   end

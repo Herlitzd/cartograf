@@ -9,6 +9,7 @@ end
 defmodule PerformanceTest do
   use ExUnit.Case
   use Cartograf
+  use Revised
 
   m AP, BP, :new do
     let(:a, :aa)
@@ -19,13 +20,19 @@ defmodule PerformanceTest do
 
   t(AP, BP, :tst, let: {:a, :aa}, let: {:b, :bb}, let: {:c, :cc}, let: {:d, :dd})
 
-  map AP, BP, :old do
+  Cartograf.map AP, BP, :old do
     [
-      let(:a, :aa),
-      let(:b, :bb),
-      let(:c, :cc),
-      let(:d, :dd)
+      Cartograf.let(:a, :aa),
+      Cartograf.let(:b, :bb),
+      Cartograf.let(:c, :cc),
+      Cartograf.let(:d, :dd)
     ]
+  end
+  Revised.map AP, BP, :best do
+    Revised.let(:a, :aa)
+    Revised.let(:b, :bb)
+    Revised.let(:c, :cc)
+    Revised.let(:d, :dd)
   end
 
   test "perf" do
@@ -55,6 +62,16 @@ defmodule PerformanceTest do
 
     raw_diff = Time.diff(Time.utc_now(), start, :microsecond)
     IO.puts("raw " <> inspect(raw_diff))
+
+    start = Time.utc_now()
+
+    for n <- 0..1_000_000 do
+      best(%AP{a: 1, b: 2, c: 3, d: 4})
+    end
+
+    raw_diff = Time.diff(Time.utc_now(), start, :microsecond)
+    IO.puts("best " <> inspect(raw_diff))
+
   end
 
   def direct(str) do
