@@ -23,6 +23,16 @@ defmodule RevisedTest do
     let :c, :cc
     let :d, :dd
   end
+  map AR, BR, :with_nest do
+    let :a, :aa
+    const :bb, "abc"
+    nest :cc, AR do
+      let :a, :a
+      let :b, :b
+    end
+    let :c, :cc
+    let :d, :dd
+  end
   test "rev" do
     p = %AR{a: 1, b: 2, c: 3, d: 4}
     k = revised(p)
@@ -37,6 +47,17 @@ defmodule RevisedTest do
     assert k.aa == 1
     assert k.bb == "abc"
     assert k.cc == 3
+    assert k.dd == 4
+  end
+
+  test "revised with nest" do
+    p = %AR{a: 1, b: 2, c: 3, d: 4}
+    k = with_nest(p)
+    assert k.aa == 1
+    assert k.bb == "abc"
+    assert %AR{} = k.cc
+    assert k.cc.a == 1
+    assert k.cc.b == 2
     assert k.dd == 4
   end
 end
