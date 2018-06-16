@@ -18,6 +18,7 @@ defmodule Revised do
       Map.update(acc, atm, [tup], fn val -> [tup | val] end)
     end)
   end
+
   defp get_list(lst, atom) do
     Map.get(lst, atom, [])
   end
@@ -33,7 +34,6 @@ defmodule Revised do
       Enum.reduce(get_list(bindings, :let), [], fn {f, t}, acc ->
         [{t, quote(do: unquote(bound).unquote(f))} | acc]
       end)
-
 
     merged_mapping = let_mapping ++ const_mapping
     {:%, [], [to, {:%{}, [], merged_mapping}]}
@@ -51,9 +51,7 @@ defmodule Revised do
           k -> k
         end
       end)
-    # IO.inspect(children)
     mappings = tokenize(children)
-    # IO.inspect(mappings)
     make_map({mappings, to_t, binding})
   end
 
@@ -69,17 +67,10 @@ defmodule Revised do
     end
   end
 
-  #  @spec m(module(), module(), atom, [], do: any()) :: any()
+  @spec map(module(), module(), atom, [], do: any()) :: any()
   defmacro map(from_t, to_t, name, opts \\ [], do: block) do
     children = get_children(block)
-
-    # children =
-    #   Macro.prewalk(children, fn mappings ->
-    #     Macro.expand(mappings, __ENV__)
-    #   end)
-
     auto? = Keyword.get(opts, :auto, true)
-
     map_p(from_t, to_t, name, auto?, children)
   end
 
@@ -100,13 +91,7 @@ defmodule Revised do
   @spec nest(atom(), module(), do: any()) :: any()
   defmacro nest(dest_key, to_t, do: block) do
     children = get_children(block)
-
-    # children =
-    #   Macro.prewalk(children, fn mappings ->
-    #     Macro.expand(mappings, __ENV__)
-    #   end)
     nest_scope = fn(binding) -> map_internal(children, to_t, binding) end
-
     {:nest, {dest_key, nest_scope}}
   end
 
