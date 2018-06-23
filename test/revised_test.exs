@@ -23,6 +23,15 @@ defmodule RevisedTest do
     let :c, :cc
     let :d, :dd
   end
+  map AR, AR, :with_missing, auto: true do
+    let :a, :a
+    drop :c
+  end
+  map AR, AR, :missing do
+    let :a, :a
+    drop :c
+  end
+
   map AR, BR, :with_nest do
     let :a, :aa
     const :bb, "abc"
@@ -30,7 +39,6 @@ defmodule RevisedTest do
       let :a, :a
       let :b, :b
     end
-    let :c, :cc
     let :d, :dd
   end
   test "rev" do
@@ -59,5 +67,14 @@ defmodule RevisedTest do
     assert k.cc.a == 1
     assert k.cc.b == 2
     assert k.dd == 4
+  end
+
+  test "revised with auto" do
+    p = %AR{a: 1, b: 2, c: 3, d: 4}
+    k = with_missing(p)
+    assert k.a == 1
+    assert k.b == 2
+    assert k.c == nil
+    assert k.d == 4
   end
 end

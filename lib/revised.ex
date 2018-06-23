@@ -24,12 +24,13 @@ defmodule Revised do
   end
 
   defp make_struct_map({bindings, to, bound_var}) do
-    to_keys = []
     bound = Macro.var(bound_var, __MODULE__)
+
     const_mapping =
       Enum.reduce(get_list(bindings, :const), [], fn {t, v}, acc ->
         [{t, v} | acc]
       end)
+
     let_mapping =
       Enum.reduce(get_list(bindings, :let), [], fn {f, t}, acc ->
         [{t, quote(do: unquote(bound).unquote(f))} | acc]
@@ -40,30 +41,62 @@ defmodule Revised do
   end
 
   defp random_id do
-    String.to_atom(Integer.to_string(:rand.uniform(4294967296), 32))
+    String.to_atom(Integer.to_string(:rand.uniform(4_294_967_296), 32))
   end
-  defp map_internal(children, to_t, binding) do
+
+  defp verify_mappings(mapped_keys, from_keys) do
+    not_mapped = Enum.filter(from_keys, fn key -> not (key in mapped_keys) and key != :__struct__ end)
+    IO.inspect(not_mapped)
+    if(not Enum.empty?(not_mapped)) do
+      raise Cartograf.MappingException, message: "not mapped: #{inspect(not_mapped)}"
+    end
+  end
+
+  defp map_internal(children, to_t, binding, auto?, from_t \\ nil) do
     children =
       Macro.prewalk(children, fn mappings ->
         mappings = Macro.expand(mappings, __ENV__)
+
         case mappings do
           {:nest, {key, nest_fn}} -> {:const, {key, nest_fn.(binding)}}
-          k -> k
+          other -> other
         end
       end)
+
     mappings = tokenize(children)
-    make_struct_map({mappings, to_t, binding})
+    # Get keys that are already mapped
+    mapped =
+      Keyword.keys(get_list(mappings, :let)) ++ Enum.map(get_list(mappings, :drop), &elem(&1, 0))
+
+    if(auto?) do
+      to_atoms = Map.keys(struct(to_t))
+      from_atoms = Map.keys(struct(from_t))
+      # Get shared keys between to and from
+      shared = Enum.filter(to_atoms, fn key -> key in from_atoms end)
+      # Get shared keys that are not mapped
+      shared = Enum.filter(shared, fn key -> not (key in mapped) && key != :__struct__ end)
+      # Add let entries for missing shared keys
+      mappings =
+        Map.update(mappings, :let, [], fn val ->
+          Keyword.merge(val, Enum.map(shared, fn a -> {a, a} end))
+        end)
+
+      make_struct_map({mappings, to_t, binding})
+    else
+      make_struct_map({mappings, to_t, binding})
+    end
   end
 
   defp map_p(from_t, to_t, name, auto?, children) do
     binding = random_id()
-    created_map = map_internal(children, to_t, binding)
-    IO.inspect(created_map)
+    created_map = map_internal(children, to_t, binding, auto?, from_t)
     binding = Macro.var(binding, __MODULE__)
+
     quote do
       def unquote(name)(unquote(binding) = %unquote(from_t){}) do
         unquote(created_map)
       end
+
       def unquote(:"#{name}_map")(unquote(binding) = %unquote(from_t){}) do
         Map.from_struct(unquote(created_map))
       end
@@ -73,7 +106,9 @@ defmodule Revised do
   @spec map(module(), module(), atom, [], do: any()) :: any()
   defmacro map(from_t, to_t, name, opts \\ [], do: block) do
     children = get_children(block)
-    auto? = Keyword.get(opts, :auto, true)
+    from_t = Macro.expand(from_t, __CALLER__)
+    to_t = Macro.expand(to_t, __CALLER__)
+    auto? = Keyword.get(opts, :auto, false)
     map_p(from_t, to_t, name, auto?, children)
   end
 
@@ -94,7 +129,8 @@ defmodule Revised do
   @spec nest(atom(), module(), do: any()) :: any()
   defmacro nest(dest_key, to_t, do: block) do
     children = get_children(block)
-    nest_scope = fn(binding) -> map_internal(children, to_t, binding) end
+    to_t = Macro.expand(to_t, __CALLER__)
+    nest_scope = fn binding -> map_internal(children, to_t, binding, false) end
     {:nest, {dest_key, nest_scope}}
   end
 

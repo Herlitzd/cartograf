@@ -18,8 +18,6 @@ defmodule PerformanceTest do
     let(:d, :dd)
   end
 
-  t(AP, BP, :tst, let: {:a, :aa}, let: {:b, :bb}, let: {:c, :cc}, let: {:d, :dd})
-
   Cartograf.map AP, BP, :old do
     [
       Cartograf.let(:a, :aa),

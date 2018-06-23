@@ -87,11 +87,6 @@ defmodule Cartograf do
     end
   end
 
-  @spec t(module(), module(), atom, list()) :: any()
-  defmacro t(from_t, to_t, name, kw \\ []) do
-    IO.inspect(kw)
-  end
-
   @spec m(module(), module(), atom, [], do: any()) :: any()
   defmacro m(from_t, to_t, name, opts \\ [], do: block) do
     children = get_children(block)
