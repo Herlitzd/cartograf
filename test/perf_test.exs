@@ -16,11 +16,11 @@ defmodule PerformanceTest do
     let(:c, :cc)
     let(:d, :dd)
   end
-
+  @tag :skip
   test "perf" do
     start = Time.utc_now()
 
-    for n <- 0..10_000_000 do
+    for _ <- 0..10_000_000 do
       direct(%AP{a: 1, b: 2, c: 3, d: 4})
     end
 
@@ -29,7 +29,7 @@ defmodule PerformanceTest do
 
     start = Time.utc_now()
 
-    for n <- 0..10_000_000 do
+    for _ <- 0..10_000_000 do
       cart(%AP{a: 1, b: 2, c: 3, d: 4})
     end
 

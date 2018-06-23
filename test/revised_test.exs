@@ -31,6 +31,8 @@ defmodule RevisedTest do
   map AR, AR, :missing do
     let :a, :a
     drop :c
+    drop :b
+    drop :d
   end
 
   map AR, BR, :with_nest do
@@ -41,6 +43,8 @@ defmodule RevisedTest do
       let :b, :b
     end
     let :d, :dd
+    drop :b
+    drop :c
   end
   test "rev" do
     p = %AR{a: 1, b: 2, c: 3, d: 4}
