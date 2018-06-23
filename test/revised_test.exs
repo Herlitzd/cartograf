@@ -19,6 +19,7 @@ defmodule RevisedTest do
   end
   map AR, BR, :with_const do
     let :a, :aa
+    drop :b
     const :bb, "abc"
     let :c, :cc
     let :d, :dd

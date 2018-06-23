@@ -8,71 +8,36 @@ end
 
 defmodule PerformanceTest do
   use ExUnit.Case
-  use Cartograf
   use Revised
 
-  m AP, BP, :new do
+  map AP, BP, :cart do
     let(:a, :aa)
     let(:b, :bb)
     let(:c, :cc)
     let(:d, :dd)
   end
 
-  Cartograf.map AP, BP, :old do
-    [
-      Cartograf.let(:a, :aa),
-      Cartograf.let(:b, :bb),
-      Cartograf.let(:c, :cc),
-      Cartograf.let(:d, :dd)
-    ]
-  end
-  Revised.map AP, BP, :best do
-    Revised.let(:a, :aa)
-    Revised.let(:b, :bb)
-    Revised.let(:c, :cc)
-    Revised.let(:d, :dd)
-  end
-
   test "perf" do
     start = Time.utc_now()
 
-    for n <- 0..1_000_000 do
-      t = old(%AP{a: 1, b: 2, c: 3, d: 4})
-    end
-
-    old_diff = Time.diff(Time.utc_now(), start, :microsecond)
-    IO.puts("old " <> inspect(old_diff))
-
-    start = Time.utc_now()
-
-    for n <- 0..1_000_000 do
-      t = new(%AP{a: 1, b: 2, c: 3, d: 4}, %{})
-    end
-
-    new_diff = Time.diff(Time.utc_now(), start, :microsecond)
-    IO.puts("new " <> inspect(new_diff))
-    IO.inspect(new_diff / old_diff)
-    start = Time.utc_now()
-
-    for n <- 0..1_000_000 do
+    for n <- 0..10_000_000 do
       direct(%AP{a: 1, b: 2, c: 3, d: 4})
     end
 
     raw_diff = Time.diff(Time.utc_now(), start, :microsecond)
-    IO.puts("raw " <> inspect(raw_diff))
+    IO.puts("raw " <> inspect(raw_diff) <> "us")
 
     start = Time.utc_now()
 
-    for n <- 0..1_000_000 do
-      best(%AP{a: 1, b: 2, c: 3, d: 4})
+    for n <- 0..10_000_000 do
+      cart(%AP{a: 1, b: 2, c: 3, d: 4})
     end
 
     raw_diff = Time.diff(Time.utc_now(), start, :microsecond)
-    IO.puts("best " <> inspect(raw_diff))
-
+    IO.puts("car " <> inspect(raw_diff) <> "us")
   end
 
-  def direct(str) do
+  def direct(str = %AP{}) do
     %BP{aa: str.a, bb: str.b, cc: str.c, dd: str.d}
   end
 end
