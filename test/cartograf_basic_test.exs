@@ -17,44 +17,34 @@ defmodule CartografTest.Basic do
   use Cartograf
 
   map A, B, :one_to_one do
-    [
-      let(:a, :aa),
-      let(:b, :bb),
-      let(:c, :cc),
+      let(:a, :aa)
+      let(:b, :bb)
+      let(:c, :cc)
       let(:d, :dd)
-    ]
   end
 
-  map A, C, :auto_but_one do
-    [
+  map A, C, :auto_but_one, auto: true do
       let(:d, :dd)
-    ]
   end
 
-  map A, C, :auto_with_drop do
-    [
+  map A, C, :auto_with_drop, auto: true do
       drop(:d)
-    ]
   end
 
-  map D, A, :unmapped_field do
-    []
+  map D, A, :unmapped_field, auto: true do
+    drop(:e)
   end
 
-  map A, A, :a_to_a, auto: false do
-    []
+  map A, A, :a_to_a, auto: true do
   end
 
-  map A, C, :with_const do
-    [
+  map A, C, :with_const, auto: true do
       # We must :a here because
       # it will not be auto bound
       # as doing so would overrite
       # the const field
-      const(:a, "Hello"),
-      let(:d, :dd),
-      drop(:a)
-    ]
+      const(:a, "Hello")
+      let(:d, :dd)
   end
 
   test "one to one mapping" do
@@ -84,27 +74,10 @@ defmodule CartografTest.Basic do
     assert t.dd == nil
   end
 
-  test "unmapped field" do
-    t = %D{a: 1, b: 2, c: 3, d: 4, e: 5}
-
-    assert_raise Cartograf.MappingException, fn ->
-      unmapped_field(t)
-    end
-
-    assert catch_error(unmapped_field(t)).message =~ "not mapped: e"
-  end
 
   test "method not found" do
     t = %D{a: 1, b: 2, c: 3, d: 4, e: 5}
     assert_raise FunctionClauseError, fn -> one_to_one(t) end
-  end
-
-  test "non-auto failure" do
-    t = %A{a: 1, b: 2, c: 3, d: 4}
-
-    assert_raise Cartograf.MappingException, fn ->
-      a_to_a(t)
-    end
   end
 
   test "const use" do

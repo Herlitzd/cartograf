@@ -1,45 +1,35 @@
 defmodule Cartograf do
-  require IEx
-
   @moduledoc """
   Cartograf is a set of elixir macros for mapping fields from
   one struct to another.
   The goal is to make these struct-to-struct translations more
   robust and less cumbersome to write and maintian.
 
-  # Basic Form
+  ## Basic Form
   The basic form for using this module is of the form:
   ```elixir
   map Proj.A, Proj.B, :one_to_one do
-    [
-      let(:a, :aa),
-      let(:b, :bb),
-      let(:c, :cc),
-      let(:d, :dd)
-    ]
+      let :a, :aa
+      let :b, :bb
+      let :c, :cc
+      let :d, :dd
   end
   ```
   This structure would create a function called `one_to_one/1`
   within whatever module this the macro was invoked within.
   The `one_to_one/1` function would expect a struct of type `Proj.A`
   and return a struct of type `Proj.B` would be returned.
-  The struct returned would have the fields of the input struct, `A`,
-  mapped to the fields of the returned struct, `B`, thusly:
 
-
-  | `A`   |   to   | `B`   |
-  | ----- |:------:| ----- |
-  | `:a`  | &rarr; | `:aa` |
-  | `:b`  | &rarr; | `:bb` |
-  | `:c`  | &rarr; | `:cc` |
-  | `:d`  | &rarr; | `:dd` |
+  This Map generates a function that contains a native elixir struct syntax for
+  the destination struct. For instance, for the *Basic Example*, the following
+  function is generated.
+  ```
+  def one_to_one(bnd = %Proj.A{}) do
+    %Proj.B{aa: bdn.a, bb: bdn.b, cc: bdn.c, dd: bdn.d}
+  end
+  ```
 
   # Design Philosophy
-  Beyond the basic use, there are a number of options that can
-  be used within a `map` block beyond just the basic `let(from, to)`
-  form. However, it before introducing them, it is important to
-  understand the design philosophy and what this `cartograf` is
-  meant to do.
 
   `cartograf` is supposed to be a tool, not a hazzard.
   The point of this project is to create robust mappings from
@@ -49,13 +39,30 @@ defmodule Cartograf do
     correct type. The function generated leverages pattern
     matching on the argument to ensure that the struct
     type is the one declared when the map was specified.
-    * All input fields must be handled. Each `map()`
-    will ensure that each field of the input is mentioned
-    in some capacity. If a field should not be included in
-    in the output struct, no problem, just include a
-    `drop(input_key)`. The main purpose for this is catch
+    * All input fields *should* be handled. Each `map()`
+    will report any unmapped fields as a warning at compile
+    time. This can also be configured to not report a warning, fail
+    compilation, for more info see Config. In order to remove these
+    warnings, a `drop(input_key)` should be added to the `map()`
+    The main purpose for this is catch
     instances where developers add fields to structs, but fail
     to update the maps.
+    * Maps do not automatically map identical keys from one struct
+    to another by default. To enable this, the `auto: true` option must
+    be set in the `map`'s options.
+
+  # Configuration
+  Cartograf by default will warn about any unmapped fields to change this behaviour
+  the following configuration changes can be made.
+  * `config :cartograf, on_missing_key: :warn`
+
+    Log warning for each unmapped field
+  * `config :cartograf, on_missing_key: :ignore`
+
+    Ignore unmapped fields, don't warn or throw
+  * `config :cartograf, on_missing_key: :throw`
+
+    Raise an exception on unmapped fields, halting compilation
 
   """
 
@@ -73,32 +80,155 @@ defmodule Cartograf do
     [element]
   end
 
-  defp map_internal(from_t, to_t, name, auto?, children_fns) do
-    quote do
-      def unquote(:"#{name}")(from = %unquote(from_t){}, to \\ %unquote(to_t){}) do
-        {already_set, out} =
-          Enum.reduce(unquote(children_fns), {[], to}, fn el, {set, acc} ->
-            {just_set, new} = el.(from, acc)
-            {[just_set | set], new}
-          end)
+  defp tokenize(children) do
+    Enum.reduce(children, %{}, fn {atm, tup}, acc ->
+      Map.update(acc, atm, [tup], fn val -> [tup | val] end)
+    end)
+  end
 
-        out
+  defp get_list(lst, atom) do
+    Map.get(lst, atom, [])
+  end
+
+  defp make_struct_map({bindings, to, bound_var}) do
+    bound = Macro.var(bound_var, __MODULE__)
+
+    const_mapping =
+      Enum.reduce(get_list(bindings, :const), [], fn {t, v}, acc ->
+        [{t, v} | acc]
+      end)
+
+    let_mapping =
+      Enum.reduce(get_list(bindings, :let), [], fn {f, t}, acc ->
+        [{t, quote(do: unquote(bound).unquote(f))} | acc]
+      end)
+
+    merged_mapping = let_mapping ++ const_mapping
+    {:%, [], [to, {:%{}, [], merged_mapping}]}
+  end
+
+  defp verify_mappings(mapped_keys, from_t) do
+    if(is_nil(from_t)) do
+      []
+    else
+      from_keys = Map.keys(struct(from_t))
+
+      not_mapped =
+        Enum.filter(from_keys, fn key -> not (key in mapped_keys) and key != :__struct__ end)
+      IO.puts("mapped" <> inspect mapped_keys)
+      IO.puts("not mapped" <> inspect not_mapped)
+      not_mapped
+    end
+  end
+
+  defp unwrap_children(children, binding) do
+    Macro.prewalk(children, fn mappings ->
+      mappings = Macro.expand(mappings, __ENV__)
+
+      case mappings do
+        {:nest, {key, nest_fn}} ->
+          {ast, _nm} = nest_fn.(binding)
+          {:const, {key, ast}}
+
+        other ->
+          other
+      end
+    end)
+  end
+
+  defp map_auto(true, mappings, to_t, from_t) do
+    to_atoms = Map.keys(struct(to_t))
+    from_atoms = Map.keys(struct(from_t))
+    # Get keys that are already mapped
+    mapped =
+      Keyword.keys(get_list(mappings, :let)) ++ Enum.map(get_list(mappings, :drop), &elem(&1, 0))
+
+    # Get shared keys between to and from
+    shared = Enum.filter(to_atoms, fn key -> key in from_atoms end)
+
+    # Get shared keys that are not mapped
+    shared = Enum.filter(shared, fn key -> not (key in mapped) && key != :__struct__ end)
+    IO.puts("shared in auto" <> inspect shared)
+    IO.puts("mappings in auto" <> inspect mappings)
+    new_lets = Keyword.new(Enum.map(shared, fn a -> {a, a} end))
+    # Add let entries for missing shared keys
+    Map.update(mappings, :let, new_lets, fn val ->
+      Keyword.merge(val, new_lets)
+    end)
+  end
+
+  defp map_auto(false, mappings, _, _) do
+    mappings
+  end
+
+  defp map_internal(children, to_t, binding, auto?, from_t \\ nil) do
+    children = unwrap_children(children, binding)
+
+    mappings = tokenize(children)
+    mappings = map_auto(auto?, mappings, to_t, from_t)
+    IO.puts("mappins in mi " <> inspect mappings)
+
+    mapped =
+      Keyword.keys(get_list(mappings, :let)) ++ Enum.map(get_list(mappings, :drop), &elem(&1, 0))
+
+    not_mapped = verify_mappings(mapped, from_t)
+    {make_struct_map({mappings, to_t, binding}), not_mapped}
+  end
+
+  defp report_not_mapped(not_mapped, name, env) do
+    if(Enum.any?(not_mapped)) do
+      msg =
+        "In map \"#{name}\" the following source keys are not mapped: \n#{inspect(not_mapped)}"
+
+      stack = Macro.Env.stacktrace(env)
+
+      case Application.get_env(:cartograf, :on_missing_key, :warn) do
+        :warn ->
+          IO.warn(msg, stack)
+
+        :throw ->
+          reraise(Cartograf.MappingException, [message: msg], stack)
+
+        :ignore ->
+          nil
+
+        u ->
+          IO.warn(
+            "Cartograf expected config field :on_missing_key to
+            be either :warn, :throw, or :ignore, got :#{u}",
+            stack
+          )
+
+          IO.warn(msg, stack)
       end
     end
   end
 
-  @spec m(module(), module(), atom, [], do: any()) :: any()
-  defmacro m(from_t, to_t, name, opts \\ [], do: block) do
-    children = get_children(block)
+  defp map_p(from_t, to_t, name, auto?, map?, children, env) do
+    binding_raw = :carto
+    binding = Macro.var(binding_raw, __MODULE__)
+    {created_map, not_mapped} = map_internal(children, to_t, binding_raw, auto?, from_t)
+    report_not_mapped(not_mapped, name, env)
 
-    children_fns =
-      Macro.prewalk(children, fn k ->
-        Macro.expand(k, __ENV__)
-      end)
+    main =
+      quote do
+        def unquote(name)(unquote(binding) = %unquote(from_t){}) do
+          unquote(created_map)
+        end
+      end
 
-    auto? = Keyword.get(opts, :auto, true)
+    if(map?) do
+      map =
+        quote do
+          def unquote(:"#{name}_map")(unquote(binding) = %unquote(from_t){}) do
+            Map.from_struct(unquote(created_map))
+          end
+        end
 
-    map_internal(from_t, to_t, name, auto?, children_fns)
+      {main, map}
+    else
+      main
+    end
   end
 
   @doc """
@@ -111,11 +241,9 @@ defmodule Cartograf do
   defmodule YourModule do
     use Cartograf
     map A, B, :a_to_b do
-      [
-        let(:a, :aa),
-        let(:b, :bb),
-        let(:c, :cc)
-      ]
+        let :a, :aa
+        let :b, :bb
+        let :c, :cc
     end
   end
   ```
@@ -123,70 +251,21 @@ defmodule Cartograf do
     iex> YourModule.a_to_b(%A{a: 1, b: "2", c: :d})
     %B{aa: 1, bb: "2", cc: :d}
   ```
+  The options:
+  * `auto: true` create bindings for all matching keys of the two
+   structs which are not already mapped
+  * `map: true` create a second anologous method `'name'_map` which will return
+   a map instead of the struct (some libraries rely of creating a struct for
+  you from a map of fields)
   """
   @spec map(module(), module(), atom, [], do: any()) :: any()
   defmacro map(from_t, to_t, name, opts \\ [], do: block) do
-    quote do
-      def unquote(:"#{name}")(from = %unquote(from_t){}) do
-        opts = unquote(opts)
-        auto? = Keyword.get(opts, :auto, true)
-
-        {already_set, mapped} =
-          do_explicit_field_translation(from, %unquote(to_t){}, unquote(block))
-
-        {from_symbols_mapped, to_symbols_mapped} =
-          Enum.reduce(already_set, {[], []}, fn curr, {f, t} ->
-            {[elem(curr, 0) | f], [elem(curr, 1) | t]}
-          end)
-
-        from_symbols_mapped = [:__struct__ | from_symbols_mapped]
-
-        not_mapped =
-          Enum.filter(Map.keys(from), fn el ->
-            !Enum.member?(from_symbols_mapped, el)
-          end)
-
-        cond do
-          auto? ->
-            # try to auto map remaining fields
-            do_auto_map(mapped, from, not_mapped, to_symbols_mapped)
-
-          Enum.any?(not_mapped) ->
-            # auto is off, but some fields were missed
-            raise Cartograf.MappingException, message: "not mapped: #{inspect(not_mapped)}"
-
-          true ->
-            # if we get here, then all the fields were already mapped
-            # before even checking for auto?
-            mapped
-        end
-      end
-    end
-  end
-
-  @doc false
-  def do_auto_map(mapped_result, from_struct, not_mapped, already_set) do
-    Enum.reduce(not_mapped, mapped_result, fn curr, acc ->
-      # Try to automap, but don't override explicit binding
-      if(Map.has_key?(acc, curr) && !Enum.member?(already_set, curr)) do
-        Map.put(acc, curr, Map.get(from_struct, curr))
-      else
-        raise Cartograf.MappingException, message: "not mapped: #{curr}"
-      end
-    end)
-  end
-
-  @doc false
-  def do_explicit_field_translation(from_struct, to_struct, field_fns) do
-    Enum.reduce(field_fns, {[], to_struct}, fn fields, {keys, fns} ->
-      case fields.(from_struct, fns) do
-        {source_dest_tup, mapped_so_far} when is_tuple(source_dest_tup) ->
-          {[source_dest_tup | keys], mapped_so_far}
-
-        {source_dest_tup_lst, mapped_so_far} when is_list(source_dest_tup_lst) ->
-          {source_dest_tup_lst ++ keys, mapped_so_far}
-      end
-    end)
+    children = get_children(block)
+    from_t = Macro.expand(from_t, __CALLER__)
+    to_t = Macro.expand(to_t, __CALLER__)
+    auto? = Keyword.get(opts, :auto, false)
+    map? = Keyword.get(opts, :map, false)
+    map_p(from_t, to_t, name, auto?, map?, children, __CALLER__)
   end
 
   @doc """
@@ -195,25 +274,7 @@ defmodule Cartograf do
   """
   @spec let(atom(), atom()) :: any()
   defmacro let(source_key, dest_key) do
-    quote do
-      fn from, to ->
-        {{unquote(source_key), unquote(dest_key)},
-         Map.put(to, unquote(dest_key), Map.get(from, unquote(source_key)))}
-      end
-    end
-  end
-
-  @doc """
-  Allow for a field from the input to be excluded from
-  the output.
-  """
-  @spec drop(atom()) :: any()
-  defmacro drop(source_key) do
-    quote do
-      fn from, to ->
-        {{unquote(source_key), nil}, to}
-      end
-    end
+    {:let, {source_key, dest_key}}
   end
 
   @doc """
@@ -221,36 +282,33 @@ defmodule Cartograf do
   value.
   """
   @spec const(atom(), any()) :: any()
-  defmacro const(dest_key, value) do
-    quote do
-      fn from, to ->
-        key = unquote(dest_key)
-        {{nil, key}, Map.put(to, key, unquote(value))}
-      end
-    end
+  defmacro const(dest_key, val) do
+    {:const, {dest_key, val}}
   end
 
   @doc """
-  Used to specific a nested map within `map()`
+  Used to specify a nested map within `map()`.
+
+  This resulting struct will have the type of to_t.
+  No options are available for this macro.
   """
-  @spec nest(module(), atom(), do: any()) :: any()
-  defmacro nest(to_t, dest_key, do: block) do
-    quote do
-      fn from, to ->
-        {fields, nested} = do_explicit_field_translation(from, %unquote(to_t){}, unquote(block))
+  @spec nest(atom(), module(), do: any()) :: any()
+  defmacro nest(dest_key, to_t, do: block) do
+    children = get_children(block)
+    to_t = Macro.expand(to_t, __CALLER__)
+    nest_scope = fn binding -> map_internal(children, to_t, binding, false) end
+    {:nest, {dest_key, nest_scope}}
+  end
 
-        # When working with nested fields, it makes no sense
-        # to report which dest fields were mapped as dest is
-        # ambigous
-        source_fields = Enum.map(fields, fn el -> {elem(el, 0), nil} end)
+  @doc """
+  Allow for a field from the input to be excluded from
+  the output.
 
-        {source_fields,
-         Map.put(
-           to,
-           unquote(dest_key),
-           nested
-         )}
-      end
-    end
+  Most useful when using `auto`, however it
+  is recommended to use this for any non-mapped.
+  """
+  @spec drop(atom()) :: any()
+  defmacro drop(src_key) do
+    {:drop, {src_key}}
   end
 end

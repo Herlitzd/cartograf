@@ -9,7 +9,7 @@ end
 
 defmodule RevisedTest do
   use ExUnit.Case
-  use Revised
+  use Cartograf
 
   map AR, BR, :revised do
     let :a, :aa

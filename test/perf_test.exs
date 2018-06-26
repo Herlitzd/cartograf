@@ -8,7 +8,7 @@ end
 
 defmodule PerformanceTest do
   use ExUnit.Case
-  use Revised
+  use Cartograf
 
   map AP, BP, :cart do
     let(:a, :aa)
@@ -16,16 +16,21 @@ defmodule PerformanceTest do
     let(:c, :cc)
     let(:d, :dd)
   end
+
+  def native(str = %AP{}) do
+    %BP{aa: str.a, bb: str.b, cc: str.c, dd: str.d}
+  end
+  # Only needed for performance validation
   @tag :skip
   test "perf" do
     start = Time.utc_now()
 
     for _ <- 0..10_000_000 do
-      direct(%AP{a: 1, b: 2, c: 3, d: 4})
+      native(%AP{a: 1, b: 2, c: 3, d: 4})
     end
 
-    raw_diff = Time.diff(Time.utc_now(), start, :microsecond)
-    IO.puts("raw " <> inspect(raw_diff) <> "us")
+    diff = Time.diff(Time.utc_now(), start, :microsecond)
+    IO.puts("native " <> inspect(diff) <> "us")
 
     start = Time.utc_now()
 
@@ -33,11 +38,8 @@ defmodule PerformanceTest do
       cart(%AP{a: 1, b: 2, c: 3, d: 4})
     end
 
-    raw_diff = Time.diff(Time.utc_now(), start, :microsecond)
-    IO.puts("car " <> inspect(raw_diff) <> "us")
+    diff = Time.diff(Time.utc_now(), start, :microsecond)
+    IO.puts("car " <> inspect(diff) <> "us")
   end
 
-  def direct(str = %AP{}) do
-    %BP{aa: str.a, bb: str.b, cc: str.c, dd: str.d}
-  end
 end
