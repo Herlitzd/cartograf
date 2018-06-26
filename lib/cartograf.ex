@@ -148,8 +148,6 @@ defmodule Cartograf do
 
     # Get shared keys that are not mapped
     shared = Enum.filter(shared, fn key -> not (key in mapped) && key != :__struct__ end)
-    IO.puts("shared in auto" <> inspect shared)
-    IO.puts("mappings in auto" <> inspect mappings)
     new_lets = Keyword.new(Enum.map(shared, fn a -> {a, a} end))
     # Add let entries for missing shared keys
     Map.update(mappings, :let, new_lets, fn val ->
@@ -166,7 +164,6 @@ defmodule Cartograf do
 
     mappings = tokenize(children)
     mappings = map_auto(auto?, mappings, to_t, from_t)
-    IO.puts("mappins in mi " <> inspect mappings)
 
     mapped =
       Keyword.keys(get_list(mappings, :let)) ++ Enum.map(get_list(mappings, :drop), &elem(&1, 0))
