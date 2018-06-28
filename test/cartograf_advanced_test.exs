@@ -15,23 +15,21 @@ defmodule CartografTest.Advanced do
   use Cartograf
 
   map AA, AB, :simple_nested do
-      let(:a, :aa)
-      let(:b, :bb)
-      let(:c, :cc)
-      drop(:d)
-      nest(:dd,AC) do
-          let(:a, :a)
-          let(:b, :b)
-          let(:c, :c)
-          let(:d, :dd)
-      end
+    let(:a, :aa)
+    let(:b, :bb)
+    let(:c, :cc)
+    nest(:dd, AC) do
+      let(:a, :a)
+      let(:b, :b)
+      let(:c, :c)
+      let(:d, :dd)
+    end
   end
 
   map AA, AB, :complex_nested do
     let(:a, :aa)
     let(:b, :bb)
     let(:c, :cc)
-    drop(:d)
     nest(:dd, AC) do
       let(:a, :a)
       let(:b, :b)
@@ -62,7 +60,6 @@ defmodule CartografTest.Advanced do
     assert t.dd.c == 3
     assert t.dd.dd == 4
   end
-
 
   test "complex nested mapping" do
     t = complex_nested(%AA{a: 1, b: 2, c: 3, d: 4})

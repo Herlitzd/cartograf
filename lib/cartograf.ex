@@ -115,34 +115,39 @@ defmodule Cartograf do
 
       not_mapped =
         Enum.filter(from_keys, fn key -> not (key in mapped_keys) and key != :__struct__ end)
-      IO.puts("mapped" <> inspect mapped_keys)
-      IO.puts("not mapped" <> inspect not_mapped)
+
       not_mapped
     end
   end
 
   defp unwrap_children(children, binding) do
-    Macro.prewalk(children, fn mappings ->
+    Macro.postwalk(children, {[], []}, fn mappings, {mp, nmp} ->
       mappings = Macro.expand(mappings, __ENV__)
 
       case mappings do
         {:nest, {key, nest_fn}} ->
-          {ast, _nm} = nest_fn.(binding)
-          {:const, {key, ast}}
+          {ast, {m, nm}} = nest_fn.(binding)
+          {{:const, {key, ast}}, {m ++ mp, nm ++ nmp}}
 
         other ->
-          other
+          {other, {mp, nmp}}
       end
     end)
   end
 
-  defp map_auto(true, mappings, to_t, from_t) do
+  defp get_mapped(mappings, other \\ []) do
+    Keyword.keys(get_list(mappings, :let)) ++
+      Enum.map(get_list(mappings, :const), &elem(&1, 0)) ++
+      Enum.map(get_list(mappings, :drop), &elem(&1, 0)) ++ other
+  end
+
+  defp map_auto(true, mappings, mapped_nested, to_t, from_t) do
     to_atoms = Map.keys(struct(to_t))
     from_atoms = Map.keys(struct(from_t))
     # Get keys that are already mapped
-    mapped =
-      Keyword.keys(get_list(mappings, :let)) ++ Enum.map(get_list(mappings, :drop), &elem(&1, 0))
+    mapped = get_mapped(mappings, mapped_nested)
 
+    mapped = Enum.uniq(mapped)
     # Get shared keys between to and from
     shared = Enum.filter(to_atoms, fn key -> key in from_atoms end)
 
@@ -155,21 +160,19 @@ defmodule Cartograf do
     end)
   end
 
-  defp map_auto(false, mappings, _, _) do
+  defp map_auto(false, mappings, _, _, _) do
     mappings
   end
 
   defp map_internal(children, to_t, binding, auto?, from_t \\ nil) do
-    children = unwrap_children(children, binding)
-
+    {children, {mapped_n, _not_mapped_n}} = unwrap_children(children, binding)
     mappings = tokenize(children)
-    mappings = map_auto(auto?, mappings, to_t, from_t)
-
-    mapped =
-      Keyword.keys(get_list(mappings, :let)) ++ Enum.map(get_list(mappings, :drop), &elem(&1, 0))
+    mappings = map_auto(auto?, mappings, mapped_n, to_t, from_t)
+    mapped = get_mapped(mappings, mapped_n)
+    mapped = Enum.uniq(mapped)
 
     not_mapped = verify_mappings(mapped, from_t)
-    {make_struct_map({mappings, to_t, binding}), not_mapped}
+    {make_struct_map({mappings, to_t, binding}), {mapped, not_mapped}}
   end
 
   defp report_not_mapped(not_mapped, name, env) do
@@ -204,7 +207,10 @@ defmodule Cartograf do
   defp map_p(from_t, to_t, name, auto?, map?, children, env) do
     binding_raw = :carto
     binding = Macro.var(binding_raw, __MODULE__)
-    {created_map, not_mapped} = map_internal(children, to_t, binding_raw, auto?, from_t)
+
+    {created_map, {_mapped, not_mapped}} =
+      map_internal(children, to_t, binding_raw, auto?, from_t)
+
     report_not_mapped(not_mapped, name, env)
 
     main =
