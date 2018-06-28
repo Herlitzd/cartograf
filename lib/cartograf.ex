@@ -135,10 +135,10 @@ defmodule Cartograf do
     end)
   end
 
-  defp get_mapped(mappings, other \\ []) do
+  defp get_mapped(mappings, additional_mapped) do
     Keyword.keys(get_list(mappings, :let)) ++
       Enum.map(get_list(mappings, :const), &elem(&1, 0)) ++
-      Enum.map(get_list(mappings, :drop), &elem(&1, 0)) ++ other
+      Enum.map(get_list(mappings, :drop), &elem(&1, 0)) ++ additional_mapped
   end
 
   defp map_auto(true, mappings, mapped_nested, to_t, from_t) do
