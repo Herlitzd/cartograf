@@ -32,6 +32,7 @@ defmodule Cartograf.MixProject do
   end
 
   defp description, do: "A set of macros to help facilitate struct-to-struct field mapping."
+
   defp package() do
     [
       # This option is only needed when you don't want to use the OTP application name
@@ -43,5 +44,4 @@ defmodule Cartograf.MixProject do
       links: %{"GitHub" => "https://github.com/Herlitzd/cartograf"}
     ]
   end
-
 end

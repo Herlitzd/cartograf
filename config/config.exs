@@ -10,7 +10,7 @@ use Mix.Config
 
 # You can configure your application as:
 #
-#     config :cartograf, key: :value
+config :cartograf, on_missing_key: :throw
 #
 # and access this configuration in your application as:
 #
