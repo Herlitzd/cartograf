@@ -4,7 +4,7 @@ defmodule Cartograf.MixProject do
   def project do
     [
       app: :cartograf,
-      version: "0.1.0",
+      version: "0.2.0",
       elixir: "~> 1.6",
       deps: deps(),
       # Hex Config
