@@ -68,7 +68,7 @@ by adding `cartograf` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:cartograf, "~> 0.1.0"}
+    {:cartograf, "~> 0.2.0"} # newest version
     # or
     {:cartograf, git: "https://github.com/Herlitzd/cartograf.git"}
   ]
