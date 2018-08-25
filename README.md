@@ -15,14 +15,16 @@ use Cartograf
 
   map A, B, :a_to_b do
     [
-      # No need to directly map identical keys, i.e. 
-      # let(:a, :a)
+      let(:a, :a)
+      let(:b, :b)
+      let(:d, :d)
+      const(:e, "constant value")
       let(:cc, :c)
     ]
   end
-  # auto mapping can be turned off
-  map A, B, :a_to_b, auto: false do
-    ...
+  # auto mapping can be turned on
+  map A, B, :a_to_b, auto: true do
+    let(:cc, :c) # only need to map keys that don't match
   end
 
   map B, A, :b_to_a do
