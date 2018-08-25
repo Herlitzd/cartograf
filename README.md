@@ -14,24 +14,16 @@ defmodule YourModule do
 use Cartograf
 
   map A, B, :a_to_b do
-    [
       let(:a, :a)
       let(:b, :b)
       let(:d, :d)
       const(:e, "constant value")
       let(:cc, :c)
-    ]
   end
   # auto mapping can be turned on
   map A, B, :a_to_b, auto: true do
     let(:cc, :c) # only need to map keys that don't match
-  end
-
-  map B, A, :b_to_a do
-    [
-      # Keys that shouldn't be mapped can be dropped
-      drop(:e)
-    ]
+    drop(:e) # drop fields that won't map to avoid warnings
   end
 end
 ```
@@ -40,6 +32,19 @@ end
 iex> YourModule.a_to_b(%A{a: 1, b: 2, c: 3, d: 4})
 %B{a: 1, b: 2, c: 3, d: 4, e: nil}
 ```
+
+### Settings
+
+You can configure how cartograf warns you about poorly constructed maps. `:warn` is the
+default value for cartograf, and will result in warning about unmapped fields being logged
+at compile time. `:throw` will of course cause compilation to fail when keys are unmapped.
+Lastly, `:ignore` will not notify about unmapped fields in any way.
+``` elixir
+# You can configure your application as:
+config :cartograf, on_missing_key: :warn
+```
+
+
 ## List of Forms
 For more information, please look at the docs and tests.
 
