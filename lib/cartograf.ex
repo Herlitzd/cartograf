@@ -1,4 +1,8 @@
 defmodule Cartograf do
+  @let :let
+  @drop :drop
+  @nest :nest
+  @const :const
   @moduledoc """
   Cartograf is a set of elixir macros for mapping fields from
   one struct to another.
@@ -90,16 +94,16 @@ defmodule Cartograf do
     Map.get(lst, atom, [])
   end
 
-  defp make_struct_map({bindings, to, bound_var}) do
+  defp make_struct_map(bindings, to, bound_var) do
     bound = Macro.var(bound_var, __MODULE__)
 
     const_mapping =
-      Enum.reduce(get_list(bindings, :const), [], fn {t, v}, acc ->
+      Enum.reduce(get_list(bindings, @const), [], fn {t, v}, acc ->
         [{t, v} | acc]
       end)
 
     let_mapping =
-      Enum.reduce(get_list(bindings, :let), [], fn {f, t}, acc ->
+      Enum.reduce(get_list(bindings, @let), [], fn {f, t}, acc ->
         [{t, quote(do: unquote(bound).unquote(f))} | acc]
       end)
 
@@ -120,14 +124,13 @@ defmodule Cartograf do
     end
   end
 
-  defp unwrap_children(children, binding) do
+  defp expand_child_macros(children, binding) do
     Macro.postwalk(children, {[], []}, fn mappings, {mp, nmp} ->
       mappings = Macro.expand(mappings, __ENV__)
-
       case mappings do
-        {:nest, {key, nest_fn}} ->
+        {@nest, {key, nest_fn}} ->
           {ast, {m, nm}} = nest_fn.(binding)
-          {{:const, {key, ast}}, {m ++ mp, nm ++ nmp}}
+          {{@const, {key, ast}}, {m ++ mp, nm ++ nmp}}
 
         other ->
           {other, {mp, nmp}}
@@ -135,17 +138,17 @@ defmodule Cartograf do
     end)
   end
 
-  defp get_mapped(mappings, additional_mapped) do
-    Keyword.keys(get_list(mappings, :let)) ++
-      Enum.map(get_list(mappings, :const), &elem(&1, 0)) ++
-      Enum.map(get_list(mappings, :drop), &elem(&1, 0)) ++ additional_mapped
+  defp get_mapped_fields(mappings, additional_mapped) do
+    Keyword.keys(get_list(mappings, @let)) ++
+      Enum.map(get_list(mappings, @const), &elem(&1, 0)) ++
+      Enum.map(get_list(mappings, @drop), &elem(&1, 0)) ++ additional_mapped
   end
 
-  defp map_auto(true, mappings, mapped_nested, to_t, from_t) do
+  defp auto_map_fields(true, mappings, mapped_nested, to_t, from_t) do
     to_atoms = Map.keys(struct(to_t))
     from_atoms = Map.keys(struct(from_t))
     # Get keys that are already mapped
-    mapped = get_mapped(mappings, mapped_nested)
+    mapped = get_mapped_fields(mappings, mapped_nested)
 
     mapped = Enum.uniq(mapped)
     # Get shared keys between to and from
@@ -155,24 +158,23 @@ defmodule Cartograf do
     shared = Enum.filter(shared, fn key -> not (key in mapped) && key != :__struct__ end)
     new_lets = Keyword.new(Enum.map(shared, fn a -> {a, a} end))
     # Add let entries for missing shared keys
-    Map.update(mappings, :let, new_lets, fn val ->
+    Map.update(mappings, @let, new_lets, fn val ->
       Keyword.merge(val, new_lets)
     end)
   end
 
-  defp map_auto(false, mappings, _, _, _) do
+  defp auto_map_fields(false, mappings, _, _, _) do
     mappings
   end
 
-  defp map_internal(children, to_t, binding, auto?, from_t \\ nil) do
-    {children, {mapped_n, _not_mapped_n}} = unwrap_children(children, binding)
+  defp create_map(children, to_t, binding, auto?, from_t \\ nil) do
+    {children, {mapped_n, _not_mapped_n}} = expand_child_macros(children, binding)
     mappings = tokenize(children)
-    mappings = map_auto(auto?, mappings, mapped_n, to_t, from_t)
-    mapped = get_mapped(mappings, mapped_n)
+    mappings = auto_map_fields(auto?, mappings, mapped_n, to_t, from_t)
+    mapped = get_mapped_fields(mappings, mapped_n)
     mapped = Enum.uniq(mapped)
-
     not_mapped = verify_mappings(mapped, from_t)
-    {make_struct_map({mappings, to_t, binding}), {mapped, not_mapped}}
+    {make_struct_map(mappings, to_t, binding), {mapped, not_mapped}}
   end
 
   defp report_not_mapped(not_mapped, name, env) do
@@ -208,8 +210,7 @@ defmodule Cartograf do
     binding_raw = :carto
     binding = Macro.var(binding_raw, __MODULE__)
 
-    {created_map, {_mapped, not_mapped}} =
-      map_internal(children, to_t, binding_raw, auto?, from_t)
+    {created_map, {_mapped, not_mapped}} = create_map(children, to_t, binding_raw, auto?, from_t)
 
     report_not_mapped(not_mapped, name, env)
 
@@ -277,7 +278,7 @@ defmodule Cartograf do
   """
   @spec let(atom(), atom()) :: any()
   defmacro let(source_key, dest_key) do
-    {:let, {source_key, dest_key}}
+    {@let, {source_key, dest_key}}
   end
 
   @doc """
@@ -286,7 +287,7 @@ defmodule Cartograf do
   """
   @spec const(atom(), any()) :: any()
   defmacro const(dest_key, val) do
-    {:const, {dest_key, val}}
+    {@const, {dest_key, val}}
   end
 
   @doc """
@@ -299,8 +300,8 @@ defmodule Cartograf do
   defmacro nest(dest_key, to_t, do: block) do
     children = get_children(block)
     to_t = Macro.expand(to_t, __CALLER__)
-    nest_scope = fn binding -> map_internal(children, to_t, binding, false) end
-    {:nest, {dest_key, nest_scope}}
+    nest_scope = fn binding -> create_map(children, to_t, binding, false) end
+    {@nest, {dest_key, nest_scope}}
   end
 
   @doc """
@@ -312,6 +313,6 @@ defmodule Cartograf do
   """
   @spec drop(atom()) :: any()
   defmacro drop(src_key) do
-    {:drop, {src_key}}
+    {@drop, {src_key}}
   end
 end
