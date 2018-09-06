@@ -124,16 +124,18 @@ defmodule Cartograf do
     end
   end
 
+  # This is doing the recursive work needed for nest
   defp expand_child_macros(children, binding) do
-    Macro.postwalk(children, {[], []}, fn mappings, {mp, nmp} ->
+    Macro.postwalk(children, {[], []}, fn mappings, {mapped, not_mapped} ->
       mappings = Macro.expand(mappings, __ENV__)
+
       case mappings do
         {@nest, {key, nest_fn}} ->
-          {ast, {m, nm}} = nest_fn.(binding)
-          {{@const, {key, ast}}, {m ++ mp, nm ++ nmp}}
+          {ast, {nest_mapped, not_nest_mapped}} = nest_fn.(binding)
+          {{@const, {key, ast}}, {nest_mapped ++ mapped, not_nest_mapped ++ not_mapped}}
 
         other ->
-          {other, {mp, nmp}}
+          {other, {mapped, not_mapped}}
       end
     end)
   end
@@ -206,7 +208,7 @@ defmodule Cartograf do
     end
   end
 
-  defp map_p(from_t, to_t, name, auto?, map?, children, env) do
+  defp map_internal(from_t, to_t, name, auto?, map?, children, env) do
     binding_raw = :carto
     binding = Macro.var(binding_raw, __MODULE__)
 
@@ -269,7 +271,7 @@ defmodule Cartograf do
     to_t = Macro.expand(to_t, __CALLER__)
     auto? = Keyword.get(opts, :auto, false)
     map? = Keyword.get(opts, :map, false)
-    map_p(from_t, to_t, name, auto?, map?, children, __CALLER__)
+    map_internal(from_t, to_t, name, auto?, map?, children, __CALLER__)
   end
 
   @doc """
